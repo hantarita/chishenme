@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { Component, lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 import { HEAT_GRADIENT_CSS } from "../domain/heat";
 import { useCanteen } from "../store";
 import { FloorPlan } from "./FloorPlan";
@@ -46,10 +46,10 @@ export function App() {
     void init();
   }, [init]);
 
-  const fallBack = () => {
+  const fallBack = useCallback(() => {
     setWebglOk(false);
     setView("plan");
-  };
+  }, []);
 
   const reset = () => {
     if (window.confirm("清除你在这个浏览器里写的所有点评？演示数据不受影响。")) void resetDemo();
@@ -107,7 +107,7 @@ export function App() {
         <StallDrawer />
       </main>
 
-      <Sidebar />
+      <Sidebar onReset={reset} />
       <WheelModal />
 
       <div className="toast-region" aria-live="polite">

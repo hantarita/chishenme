@@ -129,6 +129,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .tag-mild { background: var(--accent-soft); color: var(--accent); }
 .tag-new { background: #ece6de; color: var(--ink); }
 
+.sidebar-reset { display: none; margin-top: 20px; }
 .stall-list { margin-top: 6px; }
 .stall-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 7px 6px; text-align: left; border: 0; border-radius: 6px; background: none; font-size: 14px; }
 .stall-row:hover { background: var(--bg); }
@@ -207,6 +208,7 @@ h3.bad { color: var(--bad); }
   .topbar { min-height: var(--topbar); padding: 8px 16px; flex-wrap: wrap; }
   .brand-sub { display: none; }
   .btn-quiet { display: none; }
+  .sidebar-reset { display: block; }
   .stage { height: 50dvh; min-height: 340px; }
   .sidebar { border-left: 0; border-top: 1px solid var(--line); }
   .drawer { position: fixed; z-index: 30; top: auto; bottom: 0; left: 0; width: 100%; height: 76dvh; border-radius: 16px 16px 0 0; animation-name: sheet-in; }

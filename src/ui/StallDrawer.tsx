@@ -58,11 +58,16 @@ export function StallDrawer() {
     if (!detail || !focusDishId) return;
     const listed = [...detail.top, ...detail.low].some((d) => d.id === focusDishId);
     if (!listed) setAllOpen(true);
-  }, [detail, focusDishId]);
+    // 只在换档口或换目标时展开；发表评论刷新 detail 时，不能推翻用户的收起操作
+  }, [detail?.id, focusDishId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !document.querySelector("dialog[open]")) closeStall();
+      if (e.key !== "Escape" || e.isComposing || !useCanteen.getState().selectedId) return;
+      if (document.querySelector("dialog[open]")) return;
+      // 输入时按 Esc 可能只是取消输入法，不能丢掉正在写的点评
+      if ((e.target as Element | null)?.closest?.("input, textarea, select")) return;
+      closeStall();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

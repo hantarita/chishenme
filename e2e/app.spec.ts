@@ -154,12 +154,57 @@ test("点击 3D 里的档口可以打开详情，拖动不会", async ({ page })
   await expect(page.getByTestId("stall-drawer")).toContainText("北京味道");
 });
 
+test("切到平面图后还能切回 3D", async ({ page }) => {
+  await page.goto("");
+  await expect(page.locator("canvas").first()).toBeVisible();
+  await page.getByRole("button", { name: "平面图" }).click();
+  await expect(page.getByTestId("floor-plan")).toBeVisible();
+  // R3F 卸载画布后约 500ms 才释放上下文，要等过这段时间
+  await page.waitForTimeout(1500);
+  await page.getByRole("button", { name: "3D", exact: true }).click();
+  await expect(page.locator("canvas").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "回到全景" })).toBeVisible();
+});
+
+test("输入时按 Esc 不会丢掉草稿，其他地方按 Esc 关闭详情", async ({ page }) => {
+  await page.goto("");
+  await openStall(page, "北京味道");
+  const text = page.getByTestId("review-text");
+  await text.fill("还没写完的点评");
+  await text.press("Escape");
+  await expect(text).toHaveValue("还没写完的点评");
+  await page.getByRole("heading", { name: "写点评" }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("stall-drawer")).toHaveCount(0);
+});
+
+test("再次点击同一个档口，不会清掉表单里选好的菜", async ({ page }) => {
+  await page.goto("");
+  await openStall(page, "北京味道");
+  await page.getByTestId("review-dish").selectOption({ label: "老北京炸酱面（不辣）" });
+  await openStall(page, "北京味道");
+  await page.waitForTimeout(300);
+  await expect(page.getByTestId("review-dish").locator("option:checked")).toContainText("老北京炸酱面");
+});
+
+test("连续点两次删除不会报错", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("");
+  await openStall(page, "闽南沙茶面");
+  await writeReview(page, "用来测试重复删除", 3);
+  await page.getByTestId("review-list").getByRole("button", { name: "删除" }).dblclick();
+  await expect(page.getByTestId("stall-score")).toHaveText("暂无评分");
+  await page.waitForTimeout(400);
+  expect(errors).toEqual([]);
+});
+
 test("手机宽度没有横向滚动", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("");
   await expect(page.getByTestId("top-dishes").locator("li")).toHaveCount(5);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+  await expect(page.getByRole("button", { name: "重置演示数据" })).toBeVisible();
   await openStall(page, "北京味道");
   await expect(page.getByTestId("stall-drawer")).toBeInViewport();
 });

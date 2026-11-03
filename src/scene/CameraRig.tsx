@@ -12,25 +12,45 @@ const DRAWER_FOCAL_OFFSET = -4;
 const FULL_VIEW_ASPECT = 1.42;
 const HOME = { y: 36, z: 34, targetZ: -1.5 };
 const CLOSE_UP = { distance: 17, height: 9.5 };
+/** 大厅只有南面敞开，转到墙后面就什么都看不到了 */
+const MAX_AZIMUTH = 1.2;
 
 const prefersReducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/** 窄屏要退得更远，才能看到整个大厅 */
+const homeScale = (aspect: number) => Math.min(2.8, Math.max(1, FULL_VIEW_ASPECT / aspect));
+
 export function CameraRig() {
   const controls = useRef<CameraControls>(null);
+  const userMoved = useRef(false);
   const aspect = useThree((s) => s.viewport.aspect);
   const selectedId = useCanteen((s) => s.selectedId);
   const homeNonce = useCanteen((s) => s.homeNonce);
   const stalls = useCanteen((s) => s.stalls);
   const slotIndex = stalls.find((s) => s.id === selectedId)?.slotIndex;
+  const scale = homeScale(aspect);
+
+  const flyHome = (animate: boolean) => {
+    const c = controls.current;
+    if (!c) return;
+    c.setFocalOffset(0, 0, 0, animate);
+    c.setLookAt(0, HOME.y * scale, HOME.z * scale, 0, 0, HOME.targetZ, animate);
+  };
 
   useEffect(() => {
     const c = controls.current;
     if (!c) return;
-    const box = new THREE.Box3(
-      new THREE.Vector3(-HALL.width / 2, 0, -HALL.depth / 2),
-      new THREE.Vector3(HALL.width / 2, HALL.wallHeight, HALL.depth / 2),
+    c.setBoundary(
+      new THREE.Box3(
+        new THREE.Vector3(-HALL.width / 2, 0, -HALL.depth / 2),
+        new THREE.Vector3(HALL.width / 2, HALL.wallHeight, HALL.depth / 2),
+      ),
     );
-    c.setBoundary(box);
+    const markMoved = () => {
+      userMoved.current = true;
+    };
+    c.addEventListener("controlstart", markMoved);
+    return () => c.removeEventListener("controlstart", markMoved);
   }, []);
 
   useEffect(() => {
@@ -39,10 +59,8 @@ export function CameraRig() {
     const animate = !prefersReducedMotion();
 
     if (slotIndex === undefined) {
-      // 窄屏要退得更远，才能看到整个大厅
-      const scale = Math.min(2.8, Math.max(1, FULL_VIEW_ASPECT / aspect));
-      c.setFocalOffset(0, 0, 0, animate);
-      c.setLookAt(0, HOME.y * scale, HOME.z * scale, 0, 0, HOME.targetZ, animate);
+      userMoved.current = false;
+      flyHome(animate);
       return;
     }
 
@@ -54,16 +72,23 @@ export function CameraRig() {
     const targetX = pose.x + fx * 1.5;
     const targetZ = pose.z + fz * 1.5;
     c.setLookAt(targetX + vx * CLOSE_UP.distance, CLOSE_UP.height, targetZ + vz * CLOSE_UP.distance, targetX, 2.2, targetZ, animate);
-  }, [slotIndex, homeNonce, aspect]);
+  }, [slotIndex, homeNonce]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 画面尺寸变化（如手机地址栏收起）时只调整全景距离，不能打断用户调好的视角
+  useEffect(() => {
+    if (slotIndex === undefined && !userMoved.current) flyHome(false);
+  }, [scale]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <CameraControls
       ref={controls}
       makeDefault
       minDistance={7}
-      maxDistance={150}
+      maxDistance={Math.max(75, 60 * scale)}
       minPolarAngle={0.15}
       maxPolarAngle={1.3}
+      minAzimuthAngle={-MAX_AZIMUTH}
+      maxAzimuthAngle={MAX_AZIMUTH}
       smoothTime={0.45}
     />
   );

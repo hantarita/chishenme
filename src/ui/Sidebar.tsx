@@ -26,7 +26,7 @@ function DishButton({ dish, rank, note }: { dish: RankedDish; rank?: number; not
 
 const listedNote = (days: number) => (days <= 0 ? "今天上架" : `${days} 天前上架`);
 
-export function Sidebar() {
+export function Sidebar({ onReset }: { onReset(): void }) {
   const newDishes = useCanteen((s) => s.newDishes);
   const topDishes = useCanteen((s) => s.topDishes);
   const stalls = useCanteen((s) => s.stalls);
@@ -74,6 +74,8 @@ export function Sidebar() {
           ))}
         </ul>
       </section>
+
+      <button type="button" className="btn btn-block sidebar-reset" onClick={onReset}>重置演示数据</button>
     </aside>
   );
 }

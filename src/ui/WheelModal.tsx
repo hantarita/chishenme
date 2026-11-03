@@ -52,11 +52,18 @@ export function WheelModal() {
   const [animate, setAnimate] = useState(false);
   const [spinning, setSpinning] = useState(false);
   const [winner, setWinner] = useState<RankedDish | null>(null);
+  const [drawing, setDrawing] = useState(false);
+  const drawRequest = useRef(0);
 
   const redraw = useCallback(async (spicy: SpicyFilter) => {
+    const request = ++drawRequest.current;
     setWinner(null);
     setAnimate(false);
-    setDishes(await api.drawWheel({ spicy }));
+    setDrawing(true);
+    const drawn = await api.drawWheel({ spicy });
+    if (request !== drawRequest.current) return;
+    setDishes(drawn);
+    setDrawing(false);
   }, []);
 
   useEffect(() => {
@@ -75,7 +82,7 @@ export function WheelModal() {
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const spin = () => {
-    if (spinning || dishes.length < WHEEL_MIN) return;
+    if (spinning || drawing || dishes.length < WHEEL_MIN) return;
     // 先定结果，动画只负责停到对应扇区
     const index = Math.floor(Math.random() * dishes.length);
     const next = landingRotation(rotation, index, dishes.length, 6, Math.random() * 2 - 1);
@@ -152,7 +159,7 @@ export function WheelModal() {
 
       <div className="wheel-actions">
         <button type="button" className="btn" onClick={() => void redraw(filter)} disabled={spinning}>换一批</button>
-        <button type="button" className="btn btn-primary" onClick={spin} disabled={spinning || notEnough} data-testid="wheel-spin">
+        <button type="button" className="btn btn-primary" onClick={spin} disabled={spinning || drawing || notEnough} data-testid="wheel-spin">
           {spinning ? "转动中…" : winner ? "再转一次" : "开始转"}
         </button>
       </div>

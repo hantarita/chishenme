@@ -33,6 +33,7 @@ interface CanteenState {
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 let selectRequest = 0;
+const deleting = new Set<string>();
 
 export const useCanteen = create<CanteenState>((set, get) => {
   const refreshBoards = async () => {
@@ -74,7 +75,8 @@ export const useCanteen = create<CanteenState>((set, get) => {
       set((s) => ({
         selectedId: id,
         focusDishId: dishId,
-        reviewTarget: { dishId, nonce: s.reviewTarget.nonce + 1 },
+        // 再次点击同一个档口时，不要清掉表单里已经选好的菜
+        ...(changed || dishId ? { reviewTarget: { dishId, nonce: s.reviewTarget.nonce + 1 } } : {}),
         ...(changed ? { detail: null, reviews: [] } : {}),
       }));
       await loadStall(id);
@@ -102,11 +104,20 @@ export const useCanteen = create<CanteenState>((set, get) => {
     },
 
     removeReview: async (id) => {
-      await api.deleteReview(id);
+      if (deleting.has(id)) return;
+      deleting.add(id);
+      let message = "评论已删除";
+      try {
+        await api.deleteReview(id);
+      } catch {
+        // 可能已在其他标签页删除，下面刷新后列表就对了
+        message = "这条评论已经不存在";
+      }
       await refreshBoards();
       const selected = get().selectedId;
       if (selected) await loadStall(selected);
-      get().showToast("评论已删除");
+      deleting.delete(id);
+      get().showToast(message);
     },
 
     resetDemo: async () => {

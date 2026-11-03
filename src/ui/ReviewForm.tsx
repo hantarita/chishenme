@@ -29,6 +29,7 @@ export function ReviewForm({ detail }: { detail: StallDetail }) {
     try {
       await submitReview({ stallId: detail.id, dishId: dishId || null, author, stars, text: trimmed });
       setStars(0);
+      setHoverStars(0);
       setText("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "发布失败，请重试");
@@ -55,7 +56,7 @@ export function ReviewForm({ detail }: { detail: StallDetail }) {
 
       <div className="field">
         <span id="star-label">打分</span>
-        <div className="star-input" role="radiogroup" aria-labelledby="star-label" onMouseLeave={() => setHoverStars(0)}>
+        <div className="star-input" role="radiogroup" aria-labelledby="star-label" onPointerLeave={() => setHoverStars(0)}>
           {[1, 2, 3, 4, 5].map((n) => (
             <button
               key={n}
@@ -64,7 +65,10 @@ export function ReviewForm({ detail }: { detail: StallDetail }) {
               aria-checked={stars === n}
               aria-label={`${n} 星，${STAR_LABELS[n]}`}
               className={n <= shown ? "star-btn is-on" : "star-btn"}
-              onMouseEnter={() => setHoverStars(n)}
+              onPointerEnter={(e) => {
+                // 触屏没有悬停，模拟出来的 enter 会让星星显示成没有选中的分数
+                if (e.pointerType === "mouse") setHoverStars(n);
+              }}
               onClick={() => setStars(n)}
             >
               ★
