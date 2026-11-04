@@ -18,6 +18,24 @@ function browserBacking(): Backing | null {
   }
 }
 
+function isLocalReview(value: unknown): value is LocalReview {
+  if (typeof value !== "object" || value === null) return false;
+  const r = value as Record<string, unknown>;
+  return (
+    typeof r.id === "string" &&
+    typeof r.stallId === "string" &&
+    (typeof r.dishId === "string" || r.dishId === null) &&
+    typeof r.author === "string" &&
+    typeof r.stars === "number" &&
+    Number.isInteger(r.stars) &&
+    r.stars >= 1 &&
+    r.stars <= 5 &&
+    typeof r.text === "string" &&
+    typeof r.createdAt === "string" &&
+    !Number.isNaN(Date.parse(r.createdAt))
+  );
+}
+
 /** 无痕模式等情况下 localStorage 可能抛错，此时退回内存，当前页面仍可使用 */
 export function createReviewStorage(backing: Backing | null = browserBacking()): ReviewStorage {
   let memory: LocalReview[] | null = null;
@@ -27,7 +45,7 @@ export function createReviewStorage(backing: Backing | null = browserBacking()):
       if (memory) return memory;
       try {
         const parsed: unknown = JSON.parse(backing?.getItem(STORAGE_KEY) ?? "[]");
-        return Array.isArray(parsed) ? (parsed as LocalReview[]) : [];
+        return Array.isArray(parsed) ? parsed.filter(isLocalReview) : [];
       } catch {
         return [];
       }

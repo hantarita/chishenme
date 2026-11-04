@@ -224,3 +224,109 @@ test("禁用 WebGL 时显示 2D 平面图，且可以打开档口", async ({ pag
   await plan.getByRole("button", { name: /北京味道/ }).click();
   await expect(page.getByTestId("stall-drawer")).toBeVisible();
 });
+
+test("手机上打开详情时回到页面顶部，3D 画面露在面板上方", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("");
+  await openStall(page, "北京味道");
+  const drawer = page.getByTestId("stall-drawer");
+  await expect(drawer).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  const box = (await drawer.boundingBox())!;
+  expect(box.y).toBeGreaterThanOrEqual(844 * 0.45);
+});
+
+test("打开转盘时不会闪过“档口不足”的提示", async ({ page }) => {
+  await page.goto("");
+  await expect(page.getByTestId("top-dishes").locator("li")).toHaveCount(5);
+  await page.evaluate(() => {
+    const flags = window as unknown as { sawNotEnough: boolean };
+    flags.sawNotEnough = false;
+    new MutationObserver(() => {
+      if (document.querySelector("dialog[open]")?.textContent?.includes("不足")) flags.sawNotEnough = true;
+    }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
+  });
+  await page.getByTestId("open-wheel").click();
+  await expect(page.getByTestId("wheel-modal").locator("svg.wheel path")).toHaveCount(6);
+  expect(await page.evaluate(() => (window as unknown as { sawNotEnough: boolean }).sawNotEnough)).toBe(false);
+});
+
+test("再次点击同一道上新菜，会重新展开全部菜品", async ({ page }) => {
+  await page.goto("");
+  const rows = page.getByTestId("new-dishes").getByRole("button");
+  await expect(rows).toHaveCount(6);
+  const all = page.getByTestId("all-dishes");
+  let row = rows.first();
+  for (let i = 0; i < 6; i++) {
+    row = rows.nth(i);
+    await row.click();
+    await expect(page.getByTestId("review-form")).toBeVisible();
+    await page.waitForTimeout(100);
+    if (await all.isVisible()) break;
+  }
+  await expect(all).toBeVisible();
+  await page.getByRole("button", { name: /收起全部菜品/ }).click();
+  await expect(all).toHaveCount(0);
+  await row.click();
+  await expect(all).toBeVisible();
+});
+
+test("减少动态效果时，“回到全景”也能复位镜头", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("");
+  const canvas = page.locator("canvas").first();
+  await expect(canvas).toBeVisible();
+  await page.waitForTimeout(1500);
+  const box = (await canvas.boundingBox())!;
+  // 只截工具栏和图例之间的部分，按钮的焦点框不算镜头变化
+  const shot = () => page.screenshot({ clip: { x: box.x, y: box.y + 70, width: box.width, height: box.height - 170 } });
+  const home = await shot();
+
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.9);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.9, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(1500);
+  expect((await shot()).equals(home)).toBe(false);
+
+  await page.getByRole("button", { name: "回到全景" }).click();
+  await expect.poll(async () => (await shot()).equals(home), { timeout: 5000 }).toBe(true);
+});
+
+test("WebGL 上下文丢失后退回平面图，还能切回 3D", async ({ page }) => {
+  await page.goto("");
+  await expect(page.locator("canvas").first()).toBeVisible();
+  await page.waitForTimeout(1000);
+  await page.evaluate(() => {
+    const canvas = document.querySelector("canvas")!;
+    canvas.getContext("webgl2")!.getExtension("WEBGL_lose_context")!.loseContext();
+  });
+  await expect(page.getByTestId("floor-plan")).toBeVisible();
+  await expect(page.getByTestId("toast")).toContainText("3D");
+  await page.waitForTimeout(1500);
+  await page.getByRole("button", { name: "3D", exact: true }).click();
+  await expect(page.locator("canvas").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "回到全景" })).toBeVisible();
+});
+
+test("从转盘去档口时焦点进入详情，关闭后回到原来的按钮", async ({ page }) => {
+  await page.goto("");
+  await page.getByTestId("open-wheel").click();
+  await expect(page.getByTestId("wheel-modal").locator("svg.wheel path")).toHaveCount(6);
+  await page.getByTestId("wheel-spin").click();
+  const result = page.getByTestId("wheel-result");
+  await expect(result).toBeVisible({ timeout: 8000 });
+  await result.getByRole("button", { name: "去这个档口" }).click();
+  const close = page.getByRole("button", { name: "关闭详情" });
+  await expect(close).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("stall-drawer")).toHaveCount(0);
+  await expect(page.getByTestId("open-wheel")).toBeFocused();
+
+  const row = page.getByTestId("stall-list").getByRole("button", { name: "北京味道" });
+  await row.focus();
+  await page.keyboard.press("Enter");
+  await expect(close).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(row).toBeFocused();
+});

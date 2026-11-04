@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { api } from "./api/client";
-import type { NewReviewInput, RankedDish, Review, StallDetail, StallSummary } from "./domain/types";
+import type { NewReviewInput, RankedDish, Review, SpicyFilter, StallDetail, StallSummary } from "./domain/types";
 
 interface CanteenState {
   stalls: StallSummary[];
@@ -11,6 +11,8 @@ interface CanteenState {
   reviews: Review[];
   /** 从榜单或转盘跳来时要高亮并滚动到的菜 */
   focusDishId: string | null;
+  /** 带 nonce，重复点同一道菜也能重新定位 */
+  focusNonce: number;
   /** 评论表单预选的菜。带 nonce，重复点同一道菜也能生效 */
   reviewTarget: { dishId: string | null; nonce: number };
   wheelOpen: boolean;
@@ -28,6 +30,7 @@ interface CanteenState {
   removeReview(id: string): Promise<void>;
   resetDemo(): Promise<void>;
   setWheelOpen(open: boolean): void;
+  drawWheel(spicy: SpicyFilter): Promise<RankedDish[]>;
   showToast(message: string): void;
 }
 
@@ -56,6 +59,7 @@ export const useCanteen = create<CanteenState>((set, get) => {
     detail: null,
     reviews: [],
     focusDishId: null,
+    focusNonce: 0,
     reviewTarget: { dishId: null, nonce: 0 },
     wheelOpen: false,
     toast: null,
@@ -75,6 +79,7 @@ export const useCanteen = create<CanteenState>((set, get) => {
       set((s) => ({
         selectedId: id,
         focusDishId: dishId,
+        focusNonce: dishId ? s.focusNonce + 1 : s.focusNonce,
         // 再次点击同一个档口时，不要清掉表单里已经选好的菜
         ...(changed || dishId ? { reviewTarget: { dishId, nonce: s.reviewTarget.nonce + 1 } } : {}),
         ...(changed ? { detail: null, reviews: [] } : {}),
@@ -129,6 +134,8 @@ export const useCanteen = create<CanteenState>((set, get) => {
     },
 
     setWheelOpen: (wheelOpen) => set({ wheelOpen }),
+
+    drawWheel: (spicy) => api.drawWheel({ spicy }),
 
     showToast: (toast) => {
       clearTimeout(toastTimer);

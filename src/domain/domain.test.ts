@@ -19,6 +19,7 @@ const ranked = (id: string, weighted: number, extra: Partial<RankedDish> = {}): 
   stallName: "s",
   isNew: false,
   rating: weighted,
+  meanRating: extra.rating ?? weighted,
   reviewCount: 3,
   weighted,
   ...extra,
@@ -58,6 +59,15 @@ describe("splitRankings", () => {
     expect(top[0].id).toBe("few");
     expect(low.some((d) => d.id === "few")).toBe(false);
     expect(low[0].rating).toBe(4.2);
+  });
+
+  it("按四舍五入前的平均分排序，不让评论数决定名次", () => {
+    const stars = (dishId: string, values: number[]) => values.map((v) => ({ stallId: "s", dishId, stars: v }));
+    const reviews = [...stars("a", [5, 4, 4, 4, 4, 4]), ...stars("b", [5, 4, 4, 4, 4])];
+    const { top, low } = splitRankings(rankDishes([dish("a"), dish("b")], [stall("s")], reviews));
+    expect(top[0].rating).toBe(low[0].rating);
+    expect(top[0].id).toBe("b");
+    expect(low[0].id).toBe("a");
   });
 
   it("没有评论的菜不进榜", () => {

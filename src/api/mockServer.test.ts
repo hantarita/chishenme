@@ -92,6 +92,29 @@ describe("模拟 API", () => {
 });
 
 describe("存储容错", () => {
+  it("跳过字段不完整的本地评论，页面仍能读取", async () => {
+    const backing = memoryBacking();
+    const good = { id: "x", stallId: "minnan", dishId: null, author: "a", stars: 4, text: "味道不错呀", createdAt: "2026-01-01T00:00:00Z" };
+    const bad = [
+      null,
+      "oops",
+      { ...good, id: 1 },
+      { ...good, stars: "5" },
+      { ...good, stars: 0 },
+      { ...good, stars: 4.5 },
+      { ...good, dishId: undefined },
+      { ...good, createdAt: undefined },
+      { ...good, createdAt: "not a date" },
+    ];
+    backing.setItem(STORAGE_KEY, JSON.stringify([good, ...bad]));
+    const storage = createReviewStorage(backing);
+    expect(storage.load()).toEqual([good]);
+
+    const server = createMockServer({ storage, latencyMs: 0 });
+    expect(await server.getReviews("minnan")).toHaveLength(1);
+    expect((await server.getStall("minnan")).score).toBe(4);
+  });
+
   it("写入后可以恢复", () => {
     const backing = memoryBacking();
     const local = { id: "x", stallId: "s", dishId: null, author: "a", stars: 3, text: "还行吧吧吧", createdAt: "2026-01-01T00:00:00Z" };

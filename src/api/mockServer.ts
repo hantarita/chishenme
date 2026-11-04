@@ -2,14 +2,12 @@ import { createReviewStorage, type ReviewStorage } from "../data/storage";
 import dishesJson from "../data/seed/dishes.json";
 import reviewsJson from "../data/seed/reviews.json";
 import stallsJson from "../data/seed/stalls.json";
-import { newDishes, rankDishes, splitRankings, summarizeStalls, topDishes } from "../domain/ratings";
+import { newDishes, rankDishes, REVIEW_TEXT_MAX, REVIEW_TEXT_MIN, splitRankings, summarizeStalls, topDishes } from "../domain/ratings";
 import type { Dish, LocalReview, Review, SeedReview, Stall } from "../domain/types";
 import { drawWheel } from "../domain/wheel";
 import type { CanteenApi } from "./client";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-export const REVIEW_TEXT_MIN = 5;
-export const REVIEW_TEXT_MAX = 300;
 
 interface Options {
   storage?: ReviewStorage;

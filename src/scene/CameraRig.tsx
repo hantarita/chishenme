@@ -8,6 +8,8 @@ import { HALL, slotPose } from "./layout";
 const DESKTOP_MIN_WIDTH = 900;
 /** 抽屉盖住画面左侧，把档口往右挪 */
 const DRAWER_FOCAL_OFFSET = -4;
+/** 手机上详情面板盖住画面下方，把档口往上挪 */
+const SHEET_FOCAL_OFFSET = 1.3;
 /** 这个机位下，画面宽高比不小于该值时能看到整个大厅 */
 const FULL_VIEW_ASPECT = 1.42;
 const HOME = { y: 36, z: 34, targetZ: -1.5 };
@@ -24,6 +26,7 @@ export function CameraRig() {
   const controls = useRef<CameraControls>(null);
   const userMoved = useRef(false);
   const aspect = useThree((s) => s.viewport.aspect);
+  const invalidate = useThree((s) => s.invalidate);
   const selectedId = useCanteen((s) => s.selectedId);
   const homeNonce = useCanteen((s) => s.homeNonce);
   const stalls = useCanteen((s) => s.stalls);
@@ -61,6 +64,8 @@ export function CameraRig() {
     if (slotIndex === undefined) {
       userMoved.current = false;
       flyHome(animate);
+      // 不带动画时控件不会发事件，按需渲染下要自己请求一帧
+      if (!animate) invalidate();
       return;
     }
 
@@ -68,10 +73,11 @@ export function CameraRig() {
     const [fx, fz] = pose.front;
     const [vx, vz] = pose.view;
     const desktop = window.innerWidth >= DESKTOP_MIN_WIDTH;
-    c.setFocalOffset(desktop ? DRAWER_FOCAL_OFFSET : 0, 0, 0, animate);
+    c.setFocalOffset(desktop ? DRAWER_FOCAL_OFFSET : 0, desktop ? 0 : SHEET_FOCAL_OFFSET, 0, animate);
     const targetX = pose.x + fx * 1.5;
     const targetZ = pose.z + fz * 1.5;
     c.setLookAt(targetX + vx * CLOSE_UP.distance, CLOSE_UP.height, targetZ + vz * CLOSE_UP.distance, targetX, 2.2, targetZ, animate);
+    if (!animate) invalidate();
   }, [slotIndex, homeNonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 画面尺寸变化（如手机地址栏收起）时只调整全景距离，不能打断用户调好的视角

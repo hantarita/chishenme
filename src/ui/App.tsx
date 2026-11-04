@@ -38,6 +38,7 @@ export function App() {
   const setWheelOpen = useCanteen((s) => s.setWheelOpen);
   const resetDemo = useCanteen((s) => s.resetDemo);
   const goHome = useCanteen((s) => s.goHome);
+  const showToast = useCanteen((s) => s.showToast);
 
   const [webglOk, setWebglOk] = useState(canUseWebGL);
   const [view, setView] = useState<"3d" | "plan">(webglOk ? "3d" : "plan");
@@ -50,6 +51,12 @@ export function App() {
     setWebglOk(false);
     setView("plan");
   }, []);
+
+  // 上下文丢失常常是暂时的（如手机切到后台），重建画布就能恢复，所以保留切回 3D 的入口
+  const onContextLost = useCallback(() => {
+    setView("plan");
+    showToast("3D 画面中断了，已切到平面图，点“3D”可以恢复");
+  }, [showToast]);
 
   const reset = () => {
     if (window.confirm("清除你在这个浏览器里写的所有点评？演示数据不受影响。")) void resetDemo();
@@ -76,7 +83,7 @@ export function App() {
         {view === "3d" && webglOk ? (
           <SceneBoundary onError={fallBack}>
             <Suspense fallback={<div className="scene-loading">正在搭建食堂…</div>}>
-              <CanteenScene onContextLost={fallBack} />
+              <CanteenScene onContextLost={onContextLost} />
             </Suspense>
           </SceneBoundary>
         ) : (

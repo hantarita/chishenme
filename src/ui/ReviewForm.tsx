@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { REVIEW_TEXT_MAX, REVIEW_TEXT_MIN } from "../api/mockServer";
+import { REVIEW_TEXT_MAX, REVIEW_TEXT_MIN } from "../domain/ratings";
 import type { StallDetail } from "../domain/types";
 import { useCanteen } from "../store";
 

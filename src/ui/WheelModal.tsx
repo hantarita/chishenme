@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "../api/client";
 import type { RankedDish, SpicyFilter } from "../domain/types";
 import { landingRotation, WHEEL_MIN } from "../domain/wheel";
 import { useCanteen } from "../store";
@@ -43,6 +42,7 @@ export function WheelModal() {
   const open = useCanteen((s) => s.wheelOpen);
   const setOpen = useCanteen((s) => s.setWheelOpen);
   const selectStall = useCanteen((s) => s.selectStall);
+  const drawWheel = useCanteen((s) => s.drawWheel);
   const dialog = useRef<HTMLDialogElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -52,7 +52,7 @@ export function WheelModal() {
   const [animate, setAnimate] = useState(false);
   const [spinning, setSpinning] = useState(false);
   const [winner, setWinner] = useState<RankedDish | null>(null);
-  const [drawing, setDrawing] = useState(false);
+  const [drawing, setDrawing] = useState(true);
   const drawRequest = useRef(0);
 
   const redraw = useCallback(async (spicy: SpicyFilter) => {
@@ -60,11 +60,11 @@ export function WheelModal() {
     setWinner(null);
     setAnimate(false);
     setDrawing(true);
-    const drawn = await api.drawWheel({ spicy });
+    const drawn = await drawWheel(spicy);
     if (request !== drawRequest.current) return;
     setDishes(drawn);
     setDrawing(false);
-  }, []);
+  }, [drawWheel]);
 
   useEffect(() => {
     const el = dialog.current;
@@ -107,7 +107,8 @@ export function WheelModal() {
   };
 
   const n = dishes.length;
-  const notEnough = n < WHEEL_MIN;
+  const loading = drawing && n < WHEEL_MIN;
+  const notEnough = !drawing && n < WHEEL_MIN;
 
   return (
     <dialog ref={dialog} className="wheel-modal" onClose={() => setOpen(false)} aria-labelledby="wheel-title" data-testid="wheel-modal">
@@ -130,7 +131,9 @@ export function WheelModal() {
         ))}
       </div>
 
-      {notEnough ? (
+      {loading ? (
+        <p className="empty">正在抽菜…</p>
+      ) : notEnough ? (
         <p className="empty">符合条件的档口不足 {WHEEL_MIN} 个，换个筛选条件试试。</p>
       ) : (
         <div className="wheel-stage">
@@ -180,6 +183,8 @@ export function WheelModal() {
               type="button"
               className="btn btn-primary"
               onClick={() => {
+                // 先关弹窗，详情才能拿到焦点：弹窗开着时页面其他部分不可聚焦
+                dialog.current?.close();
                 setOpen(false);
                 void selectStall(winner.stallId, winner.id);
               }}

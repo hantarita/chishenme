@@ -59,7 +59,10 @@ export interface NewReviewInput {
 export interface RankedDish extends Dish {
   stallName: string;
   isNew: boolean;
+  /** 显示用，保留一位小数 */
   rating: number;
+  /** 排序用，未四舍五入 */
+  meanRating: number;
   reviewCount: number;
   weighted: number;
 }

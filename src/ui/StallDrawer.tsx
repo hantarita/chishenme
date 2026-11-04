@@ -10,11 +10,12 @@ const REVIEW_PAGE = 8;
 function DishItem({ dish, onReview }: { dish: RankedDish; onReview(id: string): void }) {
   const focusDishId = useCanteen((s) => s.focusDishId);
   const ref = useRef<HTMLLIElement>(null);
+  const focusNonce = useCanteen((s) => s.focusNonce);
   const focused = focusDishId === dish.id;
 
   useEffect(() => {
     if (focused) ref.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [focused]);
+  }, [focused, focusNonce]);
 
   return (
     <li ref={ref} className={focused ? "dish-item is-focused" : "dish-item"}>
@@ -46,12 +47,26 @@ export function StallDrawer() {
   const closeRef = useRef<HTMLButtonElement>(null);
   const formAnchor = useRef<HTMLDivElement>(null);
   const focusDishId = useCanteen((s) => s.focusDishId);
+  const focusNonce = useCanteen((s) => s.focusNonce);
+  const opener = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setShownReviews(REVIEW_PAGE);
     setAllOpen(false);
-    closeRef.current?.focus({ preventScroll: true });
+    if (!selectedId) {
+      // 关闭按钮卸载后焦点会掉到 body，要还给打开详情的控件
+      if (document.activeElement === document.body) opener.current?.focus({ preventScroll: true });
+      opener.current = null;
+      return;
+    }
+    opener.current ??= document.activeElement as HTMLElement | null;
+    // 手机上榜单在 3D 画面下方，要滚回顶部才能看到镜头飞过去
+    if (window.matchMedia("(max-width: 899px)").matches) window.scrollTo({ top: 0, behavior: "smooth" });
   }, [selectedId]);
+
+  useEffect(() => {
+    closeRef.current?.focus({ preventScroll: true });
+  }, [selectedId, focusNonce]);
 
   // 从榜单跳来时，这道菜可能不在推荐和避雷榜里，要展开全部菜品
   useEffect(() => {
@@ -59,7 +74,7 @@ export function StallDrawer() {
     const listed = [...detail.top, ...detail.low].some((d) => d.id === focusDishId);
     if (!listed) setAllOpen(true);
     // 只在换档口或换目标时展开；发表评论刷新 detail 时，不能推翻用户的收起操作
-  }, [detail?.id, focusDishId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [detail?.id, focusDishId, focusNonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

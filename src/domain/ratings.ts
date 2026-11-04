@@ -3,6 +3,8 @@ import type { Dish, RankedDish, Stall, StallSummary } from "./types";
 export const BAYES_M = 5;
 export const NEW_DISH_DAYS = 14;
 export const NEW_DISH_LIMIT = 6;
+export const REVIEW_TEXT_MIN = 5;
+export const REVIEW_TEXT_MAX = 300;
 
 interface Rated {
   stallId: string;
@@ -47,6 +49,7 @@ export function rankDishes(dishes: Dish[], stalls: Stall[], reviews: Rated[]): R
       stallName: stallNames.get(dish.stallId) ?? "",
       isNew: dish.listedDaysAgo <= NEW_DISH_DAYS,
       rating: roundScore(rating),
+      meanRating: rating,
       reviewCount: stars.length,
       weighted: stars.length > 0 ? bayesian(stars.length, rating, globalMean) : 0,
     };
@@ -72,7 +75,7 @@ export function newDishes(dishes: RankedDish[], limit = NEW_DISH_LIMIT): RankedD
 }
 
 function byRatingDesc(a: RankedDish, b: RankedDish): number {
-  return b.rating - a.rating || b.reviewCount - a.reviewCount || a.id.localeCompare(b.id);
+  return b.meanRating - a.meanRating || b.reviewCount - a.reviewCount || a.id.localeCompare(b.id);
 }
 
 /**
