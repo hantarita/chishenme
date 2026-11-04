@@ -2,6 +2,7 @@ import { Canvas } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import { useCanteen } from "../store";
 import { CameraRig } from "./CameraRig";
+import { Crowd } from "./Crowd";
 import { Hall } from "./Hall";
 import { StallBooth } from "./StallBooth";
 
@@ -48,6 +49,7 @@ export default function CanteenScene({ onContextLost }: Props) {
       {stalls.map((stall) => (
         <StallBooth key={stall.id} stall={stall} selected={stall.id === selectedId} onSelect={(id) => void selectStall(id)} />
       ))}
+      <Crowd stalls={stalls} />
       <CameraRig />
     </Canvas>
   );

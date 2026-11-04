@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { queueLength } from "../scene/layout";
 import { heatColor, readableTextColor } from "./heat";
 import { bayesian, newDishes, rankDishes, splitRankings, summarizeStalls, topDishes } from "./ratings";
 import type { Dish, RankedDish, Stall } from "./types";
@@ -123,7 +124,7 @@ describe("档口评分", () => {
 describe("热力色", () => {
   it("0 分纯白，5 分最红", () => {
     expect(heatColor(0)).toBe("#FFFFFF");
-    expect(heatColor(5)).toBe("#B30000");
+    expect(heatColor(5)).toBe("#99000D");
   });
 
   it("越高分绿色和蓝色通道越低", () => {
@@ -139,6 +140,19 @@ describe("热力色", () => {
   it("招牌文字在深浅底色上都可读", () => {
     expect(readableTextColor(heatColor(0))).toBe("#241F1C");
     expect(readableTextColor(heatColor(5))).toBe("#FFFFFF");
+  });
+});
+
+describe("排队人数", () => {
+  it.each([
+    [0, 0],
+    [0.5, 1],
+    [1.8, 1],
+    [3.1, 3],
+    [4.7, 4],
+    [5, 4],
+  ])("%f 分时排 %i 人", (score, people) => {
+    expect(queueLength(score)).toBe(people);
   });
 });
 
