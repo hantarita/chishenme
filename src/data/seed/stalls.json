@@ -1,0 +1,86 @@
+[
+ {
+  "id": "beijing",
+  "name": "北京味道",
+  "slotIndex": 2,
+  "cuisine": "京味",
+  "intro": "炸酱面和京酱肉丝是招牌，饭点要排队。"
+ },
+ {
+  "id": "chuanyu",
+  "name": "川渝小馆",
+  "slotIndex": 8,
+  "cuisine": "川渝",
+  "intro": "麻辣够劲，不能吃辣的同学记得看标签。"
+ },
+ {
+  "id": "lanzhou",
+  "name": "兰州牛肉面",
+  "slotIndex": 4,
+  "cuisine": "西北",
+  "intro": "现拉现煮，粗细可选。"
+ },
+ {
+  "id": "xiangwei",
+  "name": "湘味小炒",
+  "slotIndex": 10,
+  "cuisine": "湘菜",
+  "intro": "现炒出锅，下饭首选。"
+ },
+ {
+  "id": "yueshi",
+  "name": "粤式烧腊",
+  "slotIndex": 0,
+  "cuisine": "粤菜",
+  "intro": "烧鸭和叉烧每天限量，口味清淡。"
+ },
+ {
+  "id": "huaiyang",
+  "name": "淮扬小笼",
+  "slotIndex": 6,
+  "cuisine": "淮扬",
+  "intro": "小笼和汤面都偏甜口。"
+ },
+ {
+  "id": "dongbei",
+  "name": "东北饺子馆",
+  "slotIndex": 3,
+  "cuisine": "东北",
+  "intro": "份量大，价格实在。"
+ },
+ {
+  "id": "yunnan",
+  "name": "云南过桥米线",
+  "slotIndex": 11,
+  "cuisine": "滇味",
+  "intro": "汤底很烫，先放肉再放菜。"
+ },
+ {
+  "id": "shanxi",
+  "name": "山西刀削面",
+  "slotIndex": 5,
+  "cuisine": "晋味",
+  "intro": "面条筋道，浇头差异较大。"
+ },
+ {
+  "id": "xinjiang",
+  "name": "新疆风味",
+  "slotIndex": 7,
+  "cuisine": "新疆",
+  "intro": "大盘鸡分量足，但出餐较慢。"
+ },
+ {
+  "id": "xibei",
+  "name": "西北面食",
+  "slotIndex": 1,
+  "cuisine": "陕甘",
+  "intro": "最近换了师傅，评价起伏较大。"
+ },
+ {
+  "id": "minnan",
+  "name": "闽南沙茶面",
+  "slotIndex": 9,
+  "cuisine": "闽南",
+  "intro": "新开档口，主打沙茶汤底，欢迎来尝鲜。"
+ }
+]

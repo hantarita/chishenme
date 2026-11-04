@@ -1,0 +1,332 @@
+import { expect, test, type Page } from "@playwright/test";
+
+function watchErrors(page: Page) {
+  const errors: string[] = [];
+  page.on("console", (m) => {
+    if (m.type() === "error") errors.push(m.text());
+  });
+  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("response", (r) => {
+    if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`);
+  });
+  return errors;
+}
+
+const openStall = (page: Page, name: string) =>
+  page.getByTestId("stall-list").getByRole("button", { name }).click();
+
+async function writeReview(page: Page, text: string, stars: number) {
+  await page.getByRole("radio", { name: new RegExp(`^${stars} 星`) }).click();
+  await page.getByTestId("review-text").fill(text);
+  await page.getByRole("button", { name: "发布点评" }).click();
+  await expect(page.getByTestId("toast")).toContainText("已发布");
+}
+
+test("页面加载无报错，3D 画布、榜单和标注都在", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("");
+  await expect(page.locator("canvas").first()).toBeVisible();
+  await expect(page.getByTestId("top-dishes").locator("li")).toHaveCount(5);
+  await expect(page.getByTestId("new-dishes").locator("li")).toHaveCount(6);
+  await expect(page.getByTestId("stall-list").locator("li")).toHaveCount(12);
+  await expect(page.getByTestId("legend")).toContainText("均为演示数据");
+  await expect(page.getByTestId("top-dishes").locator("li").first()).toContainText(/辣/);
+  await page.waitForTimeout(1500);
+  expect(errors).toEqual([]);
+});
+
+test("档口详情按规则显示榜单", async ({ page }) => {
+  await page.goto("");
+  await openStall(page, "北京味道");
+  await expect(page.getByTestId("top-list").locator("li")).toHaveCount(5);
+  await expect(page.getByTestId("low-list").locator("li")).toHaveCount(5);
+
+  await openStall(page, "粤式烧腊");
+  await expect(page.getByTestId("top-list").locator("li")).toHaveCount(3);
+  await expect(page.getByTestId("low-list").locator("li")).toHaveCount(3);
+
+  await openStall(page, "新疆风味");
+  await expect(page.getByTestId("top-list").locator("li")).toHaveCount(3);
+  await expect(page.getByTestId("low-list").locator("li")).toHaveCount(2);
+
+  await openStall(page, "闽南沙茶面");
+  await expect(page.getByTestId("stall-drawer")).toContainText("暂无评分");
+  await expect(page.getByTestId("top-list")).toHaveCount(0);
+});
+
+test("发表评论：评分更新，刷新后还在，可删除，可重置", async ({ page }) => {
+  await page.goto("");
+  await openStall(page, "闽南沙茶面");
+  await expect(page.getByTestId("stall-score")).toHaveText("暂无评分");
+
+  await writeReview(page, "沙茶汤底很香，推荐", 5);
+  await expect(page.getByTestId("stall-score")).toHaveText("5.0");
+  await expect(page.getByTestId("review-list")).toContainText("沙茶汤底很香");
+  await expect(page.getByTestId("stall-list")).toContainText("★ 5.0");
+
+  await page.reload();
+  await openStall(page, "闽南沙茶面");
+  await expect(page.getByTestId("stall-score")).toHaveText("5.0");
+
+  await page.getByTestId("review-list").getByRole("button", { name: "删除" }).click();
+  await expect(page.getByTestId("stall-score")).toHaveText("暂无评分");
+
+  await writeReview(page, "再写一条用来测重置", 2);
+  await expect(page.getByTestId("stall-score")).toHaveText("2.0");
+  page.once("dialog", (d) => void d.accept());
+  await page.getByRole("button", { name: "重置演示数据" }).click();
+  await expect(page.getByTestId("stall-score")).toHaveText("暂无评分");
+});
+
+test("评论表单校验", async ({ page }) => {
+  await page.goto("");
+  await openStall(page, "北京味道");
+  await page.getByRole("button", { name: "发布点评" }).click();
+  await expect(page.getByRole("alert")).toHaveText("请先打分");
+  await page.getByRole("radio", { name: /^4 星/ }).click();
+  await page.getByTestId("review-text").fill("好吃");
+  await page.getByRole("button", { name: "发布点评" }).click();
+  await expect(page.getByRole("alert")).toContainText("至少");
+});
+
+test("点菜品的“评价”会预选这道菜，并滚到表单", async ({ page }) => {
+  await page.goto("");
+  await openStall(page, "北京味道");
+  const first = page.getByTestId("top-list").locator("li").first();
+  const name = (await first.locator(".board-title").innerText()).split(/\s/)[0];
+  await first.getByRole("button", { name: `评价${name}` }).click();
+  await expect(page.getByTestId("review-dish").locator("option:checked")).toContainText(name);
+  await expect(page.getByTestId("review-form")).toBeInViewport();
+  await page.waitForTimeout(900);
+  await expect(page.getByTestId("review-form")).toBeInViewport();
+});
+
+test("转盘结果可以跳转到正确的档口", async ({ page }) => {
+  await page.goto("");
+  await page.getByTestId("open-wheel").click();
+  const modal = page.getByTestId("wheel-modal");
+  await expect(modal.locator("svg.wheel path")).toHaveCount(6);
+  await page.getByTestId("wheel-spin").click();
+  const result = page.getByTestId("wheel-result");
+  await expect(result).toBeVisible({ timeout: 8000 });
+  const stallId = await result.getAttribute("data-stall");
+  const dishName = await result.locator(".wheel-dish").innerText();
+
+  await result.getByRole("button", { name: "去这个档口" }).click();
+  await expect(modal).toBeHidden();
+  await expect(page.getByTestId("stall-drawer")).toBeVisible();
+  await expect(page.getByTestId("review-dish")).toBeVisible();
+  expect(stallId).toBeTruthy();
+  await expect(page.locator(".dish-item.is-focused")).toContainText(dishName);
+});
+
+test("转盘筛选“只要辣”只出现辣菜", async ({ page }) => {
+  await page.goto("");
+  await page.getByTestId("open-wheel").click();
+  await page.getByRole("button", { name: "只要辣" }).click();
+  const tags = page.locator(".sector-tag");
+  await expect(async () => {
+    const texts = await tags.allTextContents();
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts) expect(text.startsWith("辣")).toBe(true);
+  }).toPass();
+});
+
+test("点击 3D 里的档口可以打开详情，拖动不会", async ({ page }) => {
+  await page.goto("");
+  const canvas = page.locator("canvas").first();
+  await expect(canvas).toBeVisible();
+  await page.waitForTimeout(2500);
+  const box = (await canvas.boundingBox())!;
+  // 北京味道在后墙第 3 个位置，正好在画面中线左边一点
+  const backRow = { x: box.x + box.width * 0.45, y: box.y + box.height * 0.33 };
+
+  await page.mouse.move(backRow.x, backRow.y);
+  await page.mouse.down();
+  await page.mouse.move(backRow.x + 60, backRow.y + 10, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  await expect(page.getByTestId("stall-drawer")).toHaveCount(0);
+  await page.getByRole("button", { name: "回到全景" }).click();
+  await page.waitForTimeout(2000);
+
+  await page.mouse.click(backRow.x, backRow.y);
+  await expect(page.getByTestId("stall-drawer")).toContainText("北京味道");
+});
+
+test("切到平面图后还能切回 3D", async ({ page }) => {
+  await page.goto("");
+  await expect(page.locator("canvas").first()).toBeVisible();
+  await page.getByRole("button", { name: "平面图" }).click();
+  await expect(page.getByTestId("floor-plan")).toBeVisible();
+  // R3F 卸载画布后约 500ms 才释放上下文，要等过这段时间
+  await page.waitForTimeout(1500);
+  await page.getByRole("button", { name: "3D", exact: true }).click();
+  await expect(page.locator("canvas").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "回到全景" })).toBeVisible();
+});
+
+test("输入时按 Esc 不会丢掉草稿，其他地方按 Esc 关闭详情", async ({ page }) => {
+  await page.goto("");
+  await openStall(page, "北京味道");
+  const text = page.getByTestId("review-text");
+  await text.fill("还没写完的点评");
+  await text.press("Escape");
+  await expect(text).toHaveValue("还没写完的点评");
+  await page.getByRole("heading", { name: "写点评" }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("stall-drawer")).toHaveCount(0);
+});
+
+test("再次点击同一个档口，不会清掉表单里选好的菜", async ({ page }) => {
+  await page.goto("");
+  await openStall(page, "北京味道");
+  await page.getByTestId("review-dish").selectOption({ label: "老北京炸酱面（不辣）" });
+  await openStall(page, "北京味道");
+  await page.waitForTimeout(300);
+  await expect(page.getByTestId("review-dish").locator("option:checked")).toContainText("老北京炸酱面");
+});
+
+test("连续点两次删除不会报错", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("");
+  await openStall(page, "闽南沙茶面");
+  await writeReview(page, "用来测试重复删除", 3);
+  await page.getByTestId("review-list").getByRole("button", { name: "删除" }).dblclick();
+  await expect(page.getByTestId("stall-score")).toHaveText("暂无评分");
+  await page.waitForTimeout(400);
+  expect(errors).toEqual([]);
+});
+
+test("手机宽度没有横向滚动", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("");
+  await expect(page.getByTestId("top-dishes").locator("li")).toHaveCount(5);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  await expect(page.getByRole("button", { name: "重置演示数据" })).toBeVisible();
+  await openStall(page, "北京味道");
+  await expect(page.getByTestId("stall-drawer")).toBeInViewport();
+});
+
+test("禁用 WebGL 时显示 2D 平面图，且可以打开档口", async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string, ...rest: unknown[]) {
+      if (type.startsWith("webgl")) return null;
+      return (original as (...a: unknown[]) => unknown).call(this, type, ...rest);
+    } as typeof original;
+  });
+  await page.goto("");
+  const plan = page.getByTestId("floor-plan");
+  await expect(plan).toBeVisible();
+  await expect(page.locator("canvas")).toHaveCount(0);
+  await plan.getByRole("button", { name: /北京味道/ }).click();
+  await expect(page.getByTestId("stall-drawer")).toBeVisible();
+});
+
+test("手机上打开详情时回到页面顶部，3D 画面露在面板上方", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("");
+  await openStall(page, "北京味道");
+  const drawer = page.getByTestId("stall-drawer");
+  await expect(drawer).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  const box = (await drawer.boundingBox())!;
+  expect(box.y).toBeGreaterThanOrEqual(844 * 0.45);
+});
+
+test("打开转盘时不会闪过“档口不足”的提示", async ({ page }) => {
+  await page.goto("");
+  await expect(page.getByTestId("top-dishes").locator("li")).toHaveCount(5);
+  await page.evaluate(() => {
+    const flags = window as unknown as { sawNotEnough: boolean };
+    flags.sawNotEnough = false;
+    new MutationObserver(() => {
+      if (document.querySelector("dialog[open]")?.textContent?.includes("不足")) flags.sawNotEnough = true;
+    }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
+  });
+  await page.getByTestId("open-wheel").click();
+  await expect(page.getByTestId("wheel-modal").locator("svg.wheel path")).toHaveCount(6);
+  expect(await page.evaluate(() => (window as unknown as { sawNotEnough: boolean }).sawNotEnough)).toBe(false);
+});
+
+test("再次点击同一道上新菜，会重新展开全部菜品", async ({ page }) => {
+  await page.goto("");
+  const rows = page.getByTestId("new-dishes").getByRole("button");
+  await expect(rows).toHaveCount(6);
+  const all = page.getByTestId("all-dishes");
+  let row = rows.first();
+  for (let i = 0; i < 6; i++) {
+    row = rows.nth(i);
+    await row.click();
+    await expect(page.getByTestId("review-form")).toBeVisible();
+    await page.waitForTimeout(100);
+    if (await all.isVisible()) break;
+  }
+  await expect(all).toBeVisible();
+  await page.getByRole("button", { name: /收起全部菜品/ }).click();
+  await expect(all).toHaveCount(0);
+  await row.click();
+  await expect(all).toBeVisible();
+});
+
+test("减少动态效果时，“回到全景”也能复位镜头", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("");
+  const canvas = page.locator("canvas").first();
+  await expect(canvas).toBeVisible();
+  await page.waitForTimeout(1500);
+  const box = (await canvas.boundingBox())!;
+  // 只截工具栏和图例之间的部分，按钮的焦点框不算镜头变化
+  const shot = () => page.screenshot({ clip: { x: box.x, y: box.y + 70, width: box.width, height: box.height - 170 } });
+  const home = await shot();
+
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.9);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.9, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(1500);
+  expect((await shot()).equals(home)).toBe(false);
+
+  await page.getByRole("button", { name: "回到全景" }).click();
+  await expect.poll(async () => (await shot()).equals(home), { timeout: 5000 }).toBe(true);
+});
+
+test("WebGL 上下文丢失后退回平面图，还能切回 3D", async ({ page }) => {
+  await page.goto("");
+  await expect(page.locator("canvas").first()).toBeVisible();
+  await page.waitForTimeout(1000);
+  await page.evaluate(() => {
+    const canvas = document.querySelector("canvas")!;
+    canvas.getContext("webgl2")!.getExtension("WEBGL_lose_context")!.loseContext();
+  });
+  await expect(page.getByTestId("floor-plan")).toBeVisible();
+  await expect(page.getByTestId("toast")).toContainText("3D");
+  await page.waitForTimeout(1500);
+  await page.getByRole("button", { name: "3D", exact: true }).click();
+  await expect(page.locator("canvas").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "回到全景" })).toBeVisible();
+});
+
+test("从转盘去档口时焦点进入详情，关闭后回到原来的按钮", async ({ page }) => {
+  await page.goto("");
+  await page.getByTestId("open-wheel").click();
+  await expect(page.getByTestId("wheel-modal").locator("svg.wheel path")).toHaveCount(6);
+  await page.getByTestId("wheel-spin").click();
+  const result = page.getByTestId("wheel-result");
+  await expect(result).toBeVisible({ timeout: 8000 });
+  await result.getByRole("button", { name: "去这个档口" }).click();
+  const close = page.getByRole("button", { name: "关闭详情" });
+  await expect(close).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("stall-drawer")).toHaveCount(0);
+  await expect(page.getByTestId("open-wheel")).toBeFocused();
+
+  const row = page.getByTestId("stall-list").getByRole("button", { name: "北京味道" });
+  await row.focus();
+  await page.keyboard.press("Enter");
+  await expect(close).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(row).toBeFocused();
+});
