@@ -5,10 +5,13 @@ import * as THREE from "three";
 import { heatColor } from "../domain/heat";
 import type { StallSummary } from "../domain/types";
 import { BANNER_TURN, slotPose, STALL } from "./layout";
-import { bannerTexture, glowTexture } from "./textures";
+import { awningTexture, bannerTexture, glowTexture, menuTexture, tileTexture } from "./textures";
 
 const DRAG_THRESHOLD_PX = 5;
 const BANNER_TILT = -0.32;
+/** 菜盘的颜色避开红色系，不和热力图混淆 */
+const FOOD_COLORS = ["#D9A441", "#7FA65A", "#B9793F", "#EFE3C2"];
+const TRAY_X = [-1.8, -0.6, 0.6, 1.8];
 
 interface Props {
   stall: StallSummary;
@@ -29,6 +32,7 @@ export function StallBooth({ stall, selected, onSelect }: Props) {
     () => new THREE.MeshBasicMaterial({ color, map: glowTexture(), transparent: true, opacity: 0.75, depthWrite: false }),
     [], // eslint-disable-line
   );
+  const awningMaterial = useMemo(() => new THREE.MeshLambertMaterial({ color, map: awningTexture() }), []); // eslint-disable-line
   const target = useRef(new THREE.Color(color));
   target.current.set(color);
 
@@ -39,6 +43,7 @@ export function StallBooth({ stall, selected, onSelect }: Props) {
     const t = target.current;
     if (Math.abs(c.r - t.r) + Math.abs(c.g - t.g) + Math.abs(c.b - t.b) < 0.004) c.copy(t);
     glowMaterial.color.copy(c);
+    awningMaterial.color.copy(c);
     invalidate();
   });
 
@@ -48,8 +53,9 @@ export function StallBooth({ stall, selected, onSelect }: Props) {
     () => () => {
       heatMaterial.dispose();
       glowMaterial.dispose();
+      awningMaterial.dispose();
     },
-    [heatMaterial, glowMaterial],
+    [heatMaterial, glowMaterial, awningMaterial],
   );
 
   const enter = (e: ThreeEvent<PointerEvent>) => {
@@ -98,6 +104,12 @@ export function StallBooth({ stall, selected, onSelect }: Props) {
           <boxGeometry args={[w, 0.2, d]} />
         </mesh>
 
+        {/* 后厨的白瓷砖墙 */}
+        <mesh position={[0, h / 2, -d / 2 + 0.31]}>
+          <planeGeometry args={[w - 0.4, h - 0.1]} />
+          <meshLambertMaterial map={tileTexture(5, 3)} />
+        </mesh>
+
         {/* 后厨 */}
         <mesh position={[0, 0.5, -0.8]}>
           <boxGeometry args={[w - 0.6, 1, 0.8]} />
@@ -122,12 +134,50 @@ export function StallBooth({ stall, selected, onSelect }: Props) {
           <boxGeometry args={[w - 0.6, 0.7, 0.04]} />
           <meshLambertMaterial color="#DDF1F4" transparent opacity={0.35} />
         </mesh>
-        {[-1.8, -0.6, 0.6, 1.8].map((x) => (
-          <mesh key={x} position={[x, 1.12, d / 2 - 0.45]}>
-            <boxGeometry args={[0.9, 0.1, 0.6]} />
-            <meshLambertMaterial color="#F1E3C8" />
+        {TRAY_X.map((x, i) => (
+          <group key={x} position={[x, 1.12, d / 2 - 0.45]}>
+            <mesh>
+              <boxGeometry args={[0.98, 0.08, 0.68]} />
+              <meshLambertMaterial color="#C4C8CB" />
+            </mesh>
+            <mesh position={[0, 0.06, 0]}>
+              <boxGeometry args={[0.84, 0.05, 0.54]} />
+              <meshLambertMaterial color={FOOD_COLORS[(i + stall.slotIndex) % FOOD_COLORS.length]} />
+            </mesh>
+          </group>
+        ))}
+        {/* 取餐滑轨、玻璃罩支架、碗 */}
+        <mesh position={[0, 0.98, d / 2 + 0.1]}>
+          <boxGeometry args={[w - 0.3, 0.05, 0.3]} />
+          <meshLambertMaterial color="#AEB3B7" />
+        </mesh>
+        {[-2.6, 2.6].map((x) => (
+          <mesh key={x} position={[x, 1.45, d / 2 - 0.5]}>
+            <boxGeometry args={[0.06, 0.8, 0.06]} />
+            <meshLambertMaterial color="#8E9498" />
           </mesh>
         ))}
+        <mesh position={[2.52, 1.2, d / 2 - 0.45]}>
+          <cylinderGeometry args={[0.17, 0.12, 0.26, 12]} />
+          <meshLambertMaterial color="#FBFAF6" />
+        </mesh>
+
+        {/* 雨棚 */}
+        <mesh position={[0, h - 0.18, d / 2 + 0.38]} rotation={[0.38, 0, 0]} material={awningMaterial} castShadow>
+          <boxGeometry args={[w, 0.06, 0.95]} />
+        </mesh>
+
+        {/* 门口的菜单牌 */}
+        <group position={[w / 2 - 0.55, 0, d / 2 + 0.85]}>
+          <mesh position={[0, 0.58, 0]} rotation={[-0.2, 0, 0]} castShadow>
+            <boxGeometry args={[0.82, 1.1, 0.04]} />
+            <meshLambertMaterial map={menuTexture(stall.cuisine)} />
+          </mesh>
+          <mesh position={[0, 0.58, -0.22]} rotation={[0.2, 0, 0]}>
+            <boxGeometry args={[0.82, 1.1, 0.04]} />
+            <meshLambertMaterial color="#9A7650" />
+          </mesh>
+        </group>
 
         {/* 门头招牌：前倾；侧墙的招牌再转向入口，否则从全景看几乎是侧面 */}
         <group position={[0, h + 0.85, d / 2 - 0.05]} rotation={[0, bannerYaw, 0]}>
